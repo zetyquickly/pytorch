@@ -624,7 +624,6 @@ class TestPostTrainingDynamic(QuantizationTestCase):
         model = quantize_dynamic(NestedModel().eval(), qconfig_dict)
         checkQuantized(model)
 
-    @unittest.skip("temporarily disable the test")
     @given(qengine=st.sampled_from(("fbgemm",)))
     def test_quantized_rnn(self, qengine):
         d_in, d_hid = 2, 2
@@ -801,6 +800,9 @@ class TestPostTrainingDynamic(QuantizationTestCase):
                 else:
                     self.assertEqual(packed_val, ref_val)
 
+    @given(qengine=st.sampled_from(("fbgemm",)))
+    def test_default_lstm(self, qengine):
+        with override_quantized_engine(qengine):
             # Test default instantiation
             seq_len = 128
             batch = 16
@@ -817,13 +819,13 @@ class TestPostTrainingDynamic(QuantizationTestCase):
             dtype = torch.qint8
 
             cell_dq = torch.nn.quantized.dynamic.LSTM(input_size=input_size,
-                                                      hidden_size=hidden_size,
-                                                      num_layers=num_layers,
-                                                      bias=bias,
-                                                      batch_first=False,
-                                                      dropout=0.0,
-                                                      bidirectional=bidirectional,
-                                                      dtype=dtype)
+                                                    hidden_size=hidden_size,
+                                                    num_layers=num_layers,
+                                                    bias=bias,
+                                                    batch_first=False,
+                                                    dropout=0.0,
+                                                    bidirectional=bidirectional,
+                                                    dtype=dtype)
 
             y, (h, c) = cell_dq(x, (h, c))
 
