@@ -64,6 +64,16 @@ if 'fbgemm' in torch.backends.quantized.supported_engines:
     linear_packed_params = torch.jit.script(torch.nn.quantized.modules.linear.LinearPackedParams())._c
     conv_packed_params = torch.jit.script(ConvPackedParams())._c
 
+def _preprocess_qconfig_dict_helper(module, qconfig_dict, prefix=''):
+    dict_with_names = {}
+    for name, child in module.named_children():
+        module_prefix = prefix + '.' + name if prefix else name
+        if type(child) in qconfig_dict.keys():
+            dict_with_names[module_prefix] = qconfig_dict[type(child)]
+        else:
+            dict_with_names.update(_preprocess_qconfig_dict_helper(child, qconfig_dict, module_prefix))
+    return dict_with_names
+
 def _check_is_script_module(model):
     if not isinstance(model, torch.jit.ScriptModule):
         raise ValueError('input must be a script module, got: ' + str(type(model)))
@@ -82,12 +92,23 @@ def get_scripted_qconfig_dict(qconfig_dict):
 
 def _prepare_script(model, qconfig_dict, is_dynamic):
     _check_is_script_module(model)
+    if not all(map(lambda x : isinstance(x, str), qconfig_dict.keys())):
+        raise ValueError('qconfig_dict should contain names(str) as keys. '
+                         'Run preprocess_qconfig_dict first to convert types to names')
     scripted_qconfig_dict = get_scripted_qconfig_dict(qconfig_dict)
     return wrap_cpp_module(torch._C._jit_pass_insert_observers(model._c,
                                                                'forward',
                                                                scripted_qconfig_dict,
                                                                False,
                                                                is_dynamic))
+
+def preprocess_qconfig_dict(module, qconfig_dict):
+    dict_with_names = {}
+    dict_has_types = any(map(lambda x : isinstance(x, type), qconfig_dict.keys()))
+    if dict_has_types:
+        dict_with_names = _preprocess_qconfig_dict_helper(module, qconfig_dict)
+        qconfig_dict = {x : qconfig_dict.get(x, dict_with_names[x]) for x in dict_with_names}
+    return qconfig_dict
 
 def prepare_script(model, qconfig_dict, inplace=False):
     if not inplace:
