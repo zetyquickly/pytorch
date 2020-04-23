@@ -624,7 +624,6 @@ class TestPostTrainingDynamic(QuantizationTestCase):
         model = quantize_dynamic(NestedModel().eval(), qconfig_dict)
         checkQuantized(model)
 
-    @unittest.skip("temporarily disable the test")
     @given(qengine=st.sampled_from(("fbgemm",)))
     def test_quantized_rnn(self, qengine):
         d_in, d_hid = 2, 2
@@ -801,6 +800,9 @@ class TestPostTrainingDynamic(QuantizationTestCase):
                 else:
                     self.assertEqual(packed_val, ref_val)
 
+    @given(qengine=st.sampled_from(("fbgemm",)))
+    def test_default_lstm(self, qengine):
+        with override_quantized_engine(qengine):
             # Test default instantiation
             seq_len = 128
             batch = 16
